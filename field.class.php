@@ -10,6 +10,8 @@ class data_field_multimedia extends data_field_base {
 
     function display_add_field($recordid=0) {
         global $CFG;
+        require_once($CFG->libdir.'/filelib.php');
+
         if ($recordid){
             if ($content = get_record('data_content', 'fieldid', $this->field->id, 'recordid', $recordid)) {
                 $contents[0] = $content->content;
@@ -39,29 +41,35 @@ class data_field_multimedia extends data_field_base {
         $str .= '<fieldset><legend>'.s($this->field->description).'</legend>';
         $str .= '<input type="hidden" name ="field_'.$this->field->id.'_file" value="fakevalue" />';
         $str .= '<input type="hidden" name ="field_'.$this->field->id.'_image" value="fakevalue" />';
-        $str .= get_string('file','data'). ' <input type="file" name ="field_'.$this->field->id.'_realfile" id="field_'.
-                            $this->field->id.'_realfile" title="'.s($this->field->description).'" /><br />';
-        $str .= get_string('fieldwidth', 'data').' <input type="text" name="field_' .$this->field->id.'_width"
-                            id="field_'.$this->field->id.'_width" value="'.s($width).'" /><br />';
-        $str .= get_string('fieldheight', 'data').' <input type="text" name="field_' .$this->field->id.'_height"
-                            id="field_'.$this->field->id.'_height" value="'.s($height).'" /><br />';
-        $str .= get_string('picture', 'data').' <input type="file" name="field_' .$this->field->id.'_realimage"
-                            id="field_'.$this->field->id.'_realimage" value="'.s($image).'" /><br />';
+        $str .= '<table border="0">';
+        $str .= '<tr><td align="right">'.get_string('file','data'). '</td>'.
+                '<td align="left"> <input type="file" name ="field_'.$this->field->id.'_realfile"
+                            id="field_'.$this->field->id.'_realfile" title="'.s($this->field->description).'" /></td></tr>';
+        if ($recordid and isset($content) and !empty($content->content)) {
+            $icon = mimeinfo('icon', $src);
+            $str .= '<tr><td>&nbsp;</td><td align="left">'.
+                    '<img src="'.$CFG->pixpath.'/f/'.$icon.'" class="icon" alt="'.$icon.'" />'.
+                    '<a href="'.$source.'/'.$src.'" >'.$src.'</a></td></tr>';
+        }
+        $str .= '<tr><td align="right">'.get_string('fieldwidth', 'data').'</td>'.
+                '<td align="left"> <input type="text" name="field_' .$this->field->id.'_width"
+                            id="field_'.$this->field->id.'_width" value="'.s($width).'" /></td></tr>';
+        $str .= '<tr><td align="right">'.get_string('fieldheight', 'data').'</td>'.
+                '<td align="left"> <input type="text" name="field_' .$this->field->id.'_height"
+                            id="field_'.$this->field->id.'_height" value="'.s($height).'" /></td></tr>';
+        $str .= '<tr><td align="right">'.get_string('picture', 'data').'</td>'.
+                '<td align="left"> <input type="file" name="field_' .$this->field->id.'_realimage"
+                            id="field_'.$this->field->id.'_realimage" value="'.s($image).'" /></td></tr>';
+        if ($recordid and isset($content) and !empty($content->content3)) {
+            $icon = mimeinfo('icon', $image);
+            $str .= '<tr><td>&nbsp;</td><td align="left">'.
+                    '<img src="'.$CFG->pixpath.'/f/'.$icon.'" class="icon" alt="'.$icon.'" />'.
+                    '<a href="'.$source.'/'.$image.'" >'.$image.'</a></td></tr>';
+        }
+        $str .= '</table>';
         $str .= '<input type="hidden" name="MAX_FILE_SIZE" value="'.s($this->field->param3).'" />';
         $str .= '</fieldset>';
         $str .= '</div>';
-        if ($recordid and isset($content) and !empty($content->content)) {
-            // Print icon
-            require_once($CFG->libdir.'/filelib.php');
-            $icon = mimeinfo('icon', $src);
-            $str .= '<img src="'.$CFG->pixpath.'/f/'.$icon.'" class="icon" alt="'.$icon.'" />'.
-                    '<a href="'.$source.'/'.$src.'" >'.$src.'</a>';
-            if (!empty($content->content3)) {
-                $icon = mimeinfo('icon', $image);
-                $str .= '<br /><img src="'.$CFG->pixpath.'/f/'.$icon.'" class="icon" alt="'.$icon.'" />'.
-                        '<a href="'.$source.'/'.$image.'" >'.$image.'</a>';
-            }
-        }
         return $str;
     }
 
