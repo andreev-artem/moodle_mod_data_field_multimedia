@@ -2,6 +2,7 @@
 
 class data_field_multimedia extends data_field_base {
     var $type = 'multimedia';
+    var $imageprocessed = false;
 
     function data_field_multimedia($field=0, $data=0) {
         parent::data_field_base($field, $data);
@@ -14,14 +15,17 @@ class data_field_multimedia extends data_field_base {
                 $contents[0] = $content->content;
                 $contents[1] = $content->content1;
                 $contents[2] = $content->content2;
+                $contents[3] = $content->content3;
             } else {
                 $contents[0] = '';
                 $contents[1] = '';
                 $contents[2] = '';
+                $contents[3] = '';
             }
             $src         = empty($contents[0]) ? '' : $contents[0];
             $width       = empty($contents[1]) ? 0 : $contents[1];
             $height      = empty($contents[2]) ? 0 : $contents[2];
+            $image       = empty($contents[3]) ? '' : $contents[3];
             require_once($CFG->libdir.'/filelib.php');
             $source = get_file_url($this->data->course.'/'.$CFG->moddata.'/data/'.$this->data->id.'/multimedia/'.$this->field->id.'/'.$recordid);
         } else {
@@ -29,16 +33,20 @@ class data_field_multimedia extends data_field_base {
             $width = 0;
             $height = 0;
             $source = '';
+            $image = '';
         }
         $str = '<div title="' . s($this->field->description) . '">';
-        $str .= '<fieldset><legend><span class="accesshide">'.$this->field->name.'</span></legend>';
+        $str .= '<fieldset><legend>'.s($this->field->description).'</legend>';
         $str .= '<input type="hidden" name ="field_'.$this->field->id.'_file" value="fakevalue" />';
-        $str .= get_string('file','data'). ' <input type="file" name ="field_'.$this->field->id.'" id="field_'.
-                            $this->field->id.'" title="'.s($this->field->description).'" /><br />';
+        $str .= '<input type="hidden" name ="field_'.$this->field->id.'_image" value="fakevalue" />';
+        $str .= get_string('file','data'). ' <input type="file" name ="field_'.$this->field->id.'_realfile" id="field_'.
+                            $this->field->id.'_realfile" title="'.s($this->field->description).'" /><br />';
         $str .= get_string('fieldwidth', 'data').' <input type="text" name="field_' .$this->field->id.'_width"
                             id="field_'.$this->field->id.'_width" value="'.s($width).'" /><br />';
         $str .= get_string('fieldheight', 'data').' <input type="text" name="field_' .$this->field->id.'_height"
                             id="field_'.$this->field->id.'_height" value="'.s($height).'" /><br />';
+        $str .= get_string('picture', 'data').' <input type="file" name="field_' .$this->field->id.'_realimage"
+                            id="field_'.$this->field->id.'_realimage" value="'.s($image).'" /><br />';
         $str .= '<input type="hidden" name="MAX_FILE_SIZE" value="'.s($this->field->param3).'" />';
         $str .= '</fieldset>';
         $str .= '</div>';
@@ -48,6 +56,11 @@ class data_field_multimedia extends data_field_base {
             $icon = mimeinfo('icon', $src);
             $str .= '<img src="'.$CFG->pixpath.'/f/'.$icon.'" class="icon" alt="'.$icon.'" />'.
                     '<a href="'.$source.'/'.$src.'" >'.$src.'</a>';
+            if (!empty($content->content3)) {
+                $icon = mimeinfo('icon', $image);
+                $str .= '<br /><img src="'.$CFG->pixpath.'/f/'.$icon.'" class="icon" alt="'.$icon.'" />'.
+                        '<a href="'.$source.'/'.$image.'" >'.$image.'</a>';
+            }
         }
         return $str;
     }
@@ -78,13 +91,19 @@ class data_field_multimedia extends data_field_base {
         $width = empty($content->content1) ? 0 : $content->content1;
         $height = empty($content->content2) ? 0 : $content->content2;
         $source = get_file_url($this->data->course.'/'.$CFG->moddata.'/data/'.$this->data->id.'/multimedia/'.$this->field->id.'/'.$recordid);
+        $picurl = empty($content->content3) ? '' : '&image='.$source.'/'.$content->content3;
+        $src .= $picurl; //hacked
         $link = '<a href="'. $source. '/'. $src. '?d='. $width. 'x'. $height. '"></a>';
-        $str = mediaplugin_filter($this->data->course, $link);
-        if ($str == $link) {
-            // link was not processed (not a media file etc.)
-            return "";
+        $result = '';
+        if ($CFG->filter_mediaplugin_enable_flv) {
+            $search = '/<a.*?href="([^<]+\.flv[^"?]*)(\?d=([\d]{1,4}%?)x([\d]{1,4}%?))?"[^>]*>.*?<\/a>/is'; //hacked
+            $result = preg_replace_callback($search, 'mediaplugin_filter_flv_callback', $link);
+            if ($result == $link) {
+                // link was not processed (not a media file etc.)
+                return '';
+            }
         }
-        return $str;
+        return $result;
     }
 
 
@@ -103,19 +122,41 @@ class data_field_multimedia extends data_field_base {
         $content->id = $oldcontent->id;
         $names = explode('_',$name);
         switch ($names[2]) {
+            case 'image':
+                if (!$this->imageprocessed) {
+                    $filename = $_FILES[$names[0].'_'.$names[1].'_realimage']['name'];
+                    $dir = $this->data->course.'/'.$CFG->moddata.'/data/'.$this->data->id.'/multimedia/'.$this->field->id.'/'.$recordid;
+                    require_once($CFG->libdir.'/uploadlib.php');
+                    $course = get_record("course", "id", "{$this->data->course}");
+                    //Upload image but don't delete existing files
+                    $um = new upload_manager($names[0].'_'.$names[1].'_realimage',false,false,$course,false,$this->field->param3);
+                    if ($um->process_file_uploads($dir)) {
+                        $content->content3 = $um->get_new_filename();
+                        update_record('data_content',$content);
+                    }
+                }
+                break;
+
             case 'file':
-                $filename = $_FILES[$names[0].'_'.$names[1]];
-                $filename = $filename['name'];
+                $filename = $_FILES[$names[0].'_'.$names[1].'_realfile']['name'];
                 $dir = $this->data->course.'/'.$CFG->moddata.'/data/'.$this->data->id.'/multimedia/'.$this->field->id.'/'.$recordid;
                 // only use the manager if file is present, to avoid "are you sure you selected a file to upload" msg
                 if ($filename) {
                     require_once($CFG->libdir.'/uploadlib.php');
                     $course = get_record("course", "id", "{$this->data->course}");
-                    $um = new upload_manager($names[0].'_'.$names[1],true,false,$course,false,$this->field->param3);
+                    $noimage = empty($_FILES[$names[0].'_'.$names[1].'_realimage']['name']);
+                    if ($noimage) {
+                        //Aviod php notification. It seems like a bug for multiply uploads (/lib/uploadlib.php at 225)
+                        unset($_FILES[$names[0].'_'.$names[1].'_realimage']);
+                    }
+                    //Upload all choosed files with deletion all outdated
+                    $um = new upload_manager('',true,false,$course,false,$this->field->param3);
                     if ($um->process_file_uploads($dir)) {
-                        $newfile_name = $um->get_new_filename();
-                        $content->content = $newfile_name;
+                        $content->content  = $um->files[$names[0].'_'.$names[1].'_realfile']['name'];
+                        $content->content3 = $noimage ? '' : $um->files[$names[0].'_'.$names[1].'_realimage']['name'];
                         update_record('data_content',$content);
+                        //We should not process image separately if it has already processed here
+                        $this->imageprocessed = true;
                     }
                 }
                 break;
@@ -138,7 +179,7 @@ class data_field_multimedia extends data_field_base {
     function notemptyfield($value, $name) {
         $names = explode('_',$name);
         if ($names[2] == 'file') {
-            $filename = $_FILES[$names[0].'_'.$names[1]];
+            $filename = $_FILES[$names[0].'_'.$names[1].'_real'.$names[2]];
             return !empty($filename['name']);
             // if there's a file in $_FILES, not empty
         }
