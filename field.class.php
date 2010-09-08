@@ -114,7 +114,8 @@ class data_field_multimedia extends data_field_base {
                 }
             }
         } else {
-            $link = '<a href="'. $source. '/'. $src. '"></a>';
+            $dim = in_array(strtolower($ext), array('mp3', 'ram', 'rpm', 'rm')) ? '' : ('?d='. $width. 'x'. $height);
+            $link = '<a href="'. $source. '/'. $src. $dim. '"></a>';
             $result = mediaplugin_filter($this->data->course, $link);
             if ($result == $link) {
                 // link was not processed (not a media file etc.)
