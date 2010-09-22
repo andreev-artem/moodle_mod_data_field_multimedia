@@ -101,11 +101,11 @@ class data_field_multimedia extends data_field_base {
         $width = empty($content->content1) ? 0 : $content->content1;
         $height = empty($content->content2) ? 0 : $content->content2;
         $source = get_file_url($this->data->course.'/'.$CFG->moddata.'/data/'.$this->data->id.'/multimedia/'.$this->field->id.'/'.$recordid);
-        $picurl = empty($content->content3) ? '' : '&image='.$source.'/'.$content->content3;
-        $src .= $picurl; //hacked
         $result = '';
         if ($ext === 'flv') {
             if ($CFG->filter_mediaplugin_enable_flv) {
+                $picurl = empty($content->content3) ? '' : '&image='.$source.'/'.$content->content3;
+                $src .= $picurl; //hacked
                 $link = '<a href="'. $source. '/'. $src. '?d='. $width. 'x'. $height. '"></a>';
                 $search = '/<a.*?href="([^<]+\.flv[^"?]*)(\?d=([\d]{1,4}%?)x([\d]{1,4}%?))?"[^>]*>.*?<\/a>/is'; //hacked
                 $result = preg_replace_callback($search, 'mediaplugin_filter_flv_callback', $link);
